@@ -1,0 +1,65 @@
+- name: Установить linux-headers и dkms
+  ansible.builtin.apt:
+    name:
+      - linux-headers-generic
+      - dkms
+      - make
+      - gcc
+    state: present
+    update_cache: true
+
+- name: Скачать ключ Falco
+  ansible.builtin.shell: |
+    curl -fsSL https://falco.org/repo/falcosecurity-packages.asc | \
+    gpg --dearmor -o /usr/share/keyrings/falco-archive-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/falco-archive-keyring.gpg
+
+- name: Добавить репозиторий Falco
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/falco.sources
+    content: |
+      Types: deb
+      URIs: https://download.falco.org/packages/deb
+      Suites: stable
+      Components: main
+      Signed-By: /usr/share/keyrings/falco-archive-keyring.gpg
+    mode: '0644'
+
+- name: Установить Falco 0.38.2
+  ansible.builtin.apt:
+    name: falco=0.38.2
+    state: present
+    update_cache: true
+
+- name: Отключить falco-modern-bpf
+  ansible.builtin.systemd:
+    name: falco-modern-bpf
+    state: stopped
+    enabled: false
+  ignore_errors: true
+
+- name: Собрать модуль ядра Falco (kmod)
+  ansible.builtin.shell: dkms autoinstall && modprobe falco
+  args:
+    creates: /dev/falco0
+
+- name: Включить и запустить falco.service
+  ansible.builtin.systemd:
+    name: falco
+    state: started
+    enabled: true
+
+- name: Скопировать локальные правила Falco
+  ansible.builtin.copy:
+    src: falco_rules.local.yaml
+    dest: /etc/falco/falco_rules.local.yaml
+    mode: '0644'
+  notify: Restart falco
+
+- name: Настроить rsyslog-отправитель (50-falco.conf)
+  ansible.builtin.template:
+    src: 50-falco.conf.j2
+    dest: /etc/rsyslog.d/50-falco.conf
+    mode: '0644'
+  notify: Restart rsyslog

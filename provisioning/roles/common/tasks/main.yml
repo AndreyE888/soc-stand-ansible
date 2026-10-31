@@ -1,0 +1,64 @@
+- name: Остановить systemd-resolved
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    state: stopped
+  ignore_errors: true
+
+- name: Отключить systemd-resolved из автозагрузки
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    enabled: false
+  ignore_errors: true
+
+- name: Удалить симлинк resolv.conf
+  ansible.builtin.file:
+    path: /etc/resolv.conf
+    state: absent
+
+- name: Прописать публичный DNS
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    content: |
+      nameserver 8.8.8.8
+      nameserver 1.1.1.1
+    mode: '0644'
+
+- name: Обновить apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Установить базовые пакеты
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Установить Docker (только docker и registry)
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+  when: inventory_hostname in groups['docker'] + groups['registry']
+
+- name: Добавить /etc/hosts
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} SOC stand hosts"
+    block: |
+      {% for entry in hosts_entries %}
+      {{ entry.ip }} {{ entry.name }}
+      {% endfor %}
+
+- name: Добавить vagrant в группу docker
+  ansible.builtin.user:
+    name: "{{ docker_user }}"
+    groups: "{{ docker_group }}"
+    append: true
+  register: docker_group_added
+  when: inventory_hostname in groups['docker'] + groups['registry']
+
+- name: Убедиться, что docker запущен
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+  when: inventory_hostname in groups['docker'] + groups['registry']

@@ -1,0 +1,22 @@
+# Пакеты для всех VM
+common_packages:
+  - curl
+  - gnupg
+  - openssl
+  - rsyslog
+
+# Пакеты только для docker и docker_registry
+docker_packages:
+  - docker.io
+
+docker_user: vagrant
+docker_group: docker
+
+# Записи для /etc/hosts
+hosts_entries:
+  - ip: "{{ docker_ip }}"
+    name: docker
+  - ip: "{{ registry_ip }}"
+    name: docker-registry
+  - ip: "{{ storage_ip }}"
+    name: storage

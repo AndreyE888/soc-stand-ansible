@@ -1,0 +1,54 @@
+- name: Скачать Cosign
+  ansible.builtin.get_url:
+    url: "https://github.com/sigstore/cosign/releases/download/{{ cosign_version }}/cosign-linux-amd64"
+    dest: /usr/local/bin/cosign
+    mode: '0755'
+
+- name: Сгенерировать ключи Cosign
+  ansible.builtin.shell: cosign generate-key-pair
+  args:
+    chdir: /home/vagrant
+    creates: /home/vagrant/cosign.key
+  environment:
+    COSIGN_PASSWORD: "{{ cosign_key_password }}"
+  become: false
+
+- name: Установить перехватчик Docker
+  ansible.builtin.template:
+    src: docker.j2
+    dest: /usr/local/bin/docker
+    mode: '0755'
+
+- name: Скопировать политику authz.rego в /etc/docker/
+  ansible.builtin.copy:
+    src: authz.rego
+    dest: /etc/docker/authz.rego
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Проверить, установлен ли плагин opa-authz
+  ansible.builtin.command: /usr/bin/docker plugin ls --format '{{ '{{' }}.Name{{ '}}' }}'
+  register: plugin_list
+  changed_when: false
+
+- name: Установить плагин opa-authz (если не установлен)
+  ansible.builtin.shell: >
+    /usr/bin/docker plugin install {{ opa_authz_plugin }}
+    --alias opa-authz --grant-all-permissions
+    opa-args="-policy-file /opa/authz.rego"
+  when: "'opa-authz' not in plugin_list.stdout"
+  notify: Restart docker
+
+- name: Настроить daemon.json для Docker
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    content: |
+
+      {
+        "authorization-plugins": ["opa-authz"]
+      }
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart docker

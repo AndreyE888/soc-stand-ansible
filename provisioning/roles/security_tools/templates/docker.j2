@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Перехватываем ТОЛЬКО команду run
+if [ "$1" == "run" ]; then
+    IMAGE=""
+    SKIP_NEXT=false
+
+    # Проходимся по аргументам после run
+    for arg in "${@:2}"; do
+        # Если предыдущий аргумент был опцией с значением — пропускаем текущий
+        if [ "$SKIP_NEXT" = true ]; then
+            SKIP_NEXT=false
+            continue
+        fi
+
+        # Если аргумент — опция с значением (--user, --name, --cap-add, --volume и т.д.)
+        case "$arg" in
+            --user|--name|--cap-add|--cap-drop|--volume|-v|--env|-e|--network|--restart|--workdir|-w|--entrypoint|--memory|-m|--cpus|--publish|-p)
+                SKIP_NEXT=true
+                continue
+                ;;
+            -*)
+                # Другие опции (без значения) — пропускаем
+                continue
+                ;;
+            *)
+                # Первый аргумент без дефиса — это образ
+                IMAGE="$arg"
+                break
+                ;;
+        esac
+    done
+
+    if [ -n "$IMAGE" ]; then
+        echo "[Enforcement] Проверка подписи для образа: $IMAGE..."
+        cosign verify --key /home/vagrant/cosign.pub --registry-cacert /etc/docker/certs.d/{{ registry_host }}:{{ registry_port }}/ca.crt "$IMAGE" > /dev/null 2>&1
+
+        if [ $? -ne 0 ]; then
+            echo "ОШИБКА БЕЗОПАСНОСТИ: Образ '$IMAGE' не подписан или подпись недействительна!"
+            echo "Запуск контейнера заблокирован."
+            logger -t falco-enforcement "БЛОКИРОВКА: Попытка запуска неподписанного образа $IMAGE"
+            exit 1
+        else
+            echo "Подпись валидна. Запускаем контейнер..."
+        fi
+    fi
+fi
+
+exec /usr/bin/docker "$@"

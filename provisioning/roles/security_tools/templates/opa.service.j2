@@ -1,0 +1,11 @@
+[Unit]
+Description=Open Policy Agent
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/opa run --server --addr={{ opa_addr }} /etc/opa/policies
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,34 @@
+- rule: Запуск привилегированного контейнера
+  desc: Обнаружен запуск Docker-контейнера с флагом --privileged
+  condition: >
+    spawned_process and proc.name = "docker"
+    and proc.args contains "--privileged"
+    and proc.args contains "run"
+  output: >
+    Привилегированный контейнер запущен
+    (user=%user.name command=%proc.cmdline parent=%proc.pname)
+  priority: WARNING
+  tags: [container, mitre_privilege_escalation, T1610, T1611]
+
+- rule: Запуск контейнера из недоверенного источника
+  desc: Обнаружена попытка запуска контейнера не из нашего Registry
+  condition: >
+    spawned_process and proc.name = "docker"
+    and proc.args contains "run"
+    and not proc.args contains "docker-registry:5000"
+  output: >
+    Попытка запуска из недоверенного источника
+    (user=%user.name command=%proc.cmdline)
+  priority: WARNING
+  tags: [container, mitre_privilege_escalation]
+
+- rule: Заблокирован запуск неподписанного контейнера
+  desc: Скрипт-перехватчик заблокировал запуск образа без подписи
+  condition: >
+    spawned_process and proc.name = "logger"
+    and proc.args contains "falco-enforcement"
+  output: >
+    Зафиксирована блокировка неподписанного контейнера
+    (user=%user.name command=%proc.cmdline)
+  priority: CRITICAL
+  tags: [container, mitre_privilege_escalation]

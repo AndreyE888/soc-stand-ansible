@@ -1,0 +1,12 @@
+- name: Создать директорию certs.d
+  ansible.builtin.file:
+    path: "/etc/docker/certs.d/{{ registry_host }}:{{ registry_port }}"
+    state: directory
+    mode: '0755'
+
+- name: Скопировать ca.crt
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/files/domain.crt"
+    dest: "{{ registry_ca_on_client }}"
+    mode: '0644'
+  notify: Restart docker

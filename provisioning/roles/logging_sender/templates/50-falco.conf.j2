@@ -1,0 +1,10 @@
+if $programname == 'falco' then {
+    action(type="omfwd"
+           target="{{ storage_ip }}"
+           port="{{ rsyslog_port }}"
+           protocol="tcp"
+           queue.type="LinkedList"
+           queue.filename="falco_backlog"
+           action.resumeRetryCount="-1")
+}
+& stop

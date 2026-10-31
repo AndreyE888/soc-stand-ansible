@@ -1,0 +1,12 @@
+services:
+  authz:
+    url: http://172.17.0.1:8181  # IP шлюза Docker (где слушает OPA)
+  service: authz
+  resource: /v1/data/docker/authz
+  decision_logs:
+    console: true
+
+bundles:
+  authz:
+    resource: /opa/policies/authz.rego
+    persist: false

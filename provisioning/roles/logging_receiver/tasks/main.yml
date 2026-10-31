@@ -1,0 +1,33 @@
+- name: Включить imtcp в rsyslog.conf
+  ansible.builtin.lineinfile:
+    path: /etc/rsyslog.conf
+    regexp: '^#?(module\(load="imtcp"\))'
+    line: '\1'
+    backrefs: true
+  notify: Restart rsyslog
+
+- name: Включить input imtcp в rsyslog.conf
+  ansible.builtin.lineinfile:
+    path: /etc/rsyslog.conf
+    regexp: '^#?(input\(type="imtcp" port="514"\))'
+    line: '\1'
+    backrefs: true
+  notify: Restart rsyslog
+
+- name: Создать /var/log/remote
+  ansible.builtin.file:
+    path: "{{ rsyslog_remote_dir }}"
+    state: directory
+    owner: syslog
+    group: syslog
+    mode: '0755'
+
+- name: Шаблон раскладки логов
+  ansible.builtin.copy:
+    dest: /etc/rsyslog.d/50-remote.conf
+    content: |
+      $template RemoteLogs,"{{ rsyslog_remote_dir }}/%HOSTNAME%/%PROGRAMNAME%.log"
+      *.* ?RemoteLogs
+      & stop
+    mode: '0644'
+  notify: Restart rsyslog

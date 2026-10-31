@@ -1,0 +1,36 @@
+- name: Создать директорию для сертификатов
+  ansible.builtin.file:
+    path: "{{ registry_certs_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Сгенерировать самоподписанный сертификат с SAN
+  ansible.builtin.shell: |
+    openssl req -newkey rsa:4096 -nodes -sha256 \
+      -keyout {{ registry_key }} \
+      -x509 -days 365 -out {{ registry_cert }} \
+      -subj "/C=RU/CN={{ registry_host }}" \
+      -addext "subjectAltName=DNS:{{ registry_host }},DNS:{{ registry_host }}.local,IP:{{ registry_ip }}"
+  args:
+    creates: "{{ registry_cert }}"
+
+- name: Запустить Docker Registry с TLS
+  community.docker.docker_container:
+    name: registry
+    image: registry:2
+    state: started
+    restart_policy: always
+    ports:
+      - "{{ registry_port }}:{{ registry_port }}"
+    volumes:
+      - "{{ registry_certs_dir }}:/certs"
+    env:
+      REGISTRY_HTTP_TLS_CERTIFICATE: "/certs/domain.crt"
+      REGISTRY_HTTP_TLS_KEY: "/certs/domain.key"
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+
+- name: Скопировать сертификат (domain.crt) на управляющую машину
+  ansible.builtin.fetch:
+    src: "{{ registry_cert }}"
+    dest: "files/domain.crt"
+    flat: true

@@ -1,0 +1,49 @@
+# Vagrant
+.vagrant/
+*.box
+
+# Ansible
+*.retry
+*.log
+ansible.log
+
+# Python / Pip / Virtualenv
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# OS generated files
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Security / Secrets (DO NOT COMMIT)
+provisioning/files/domain.crt
+provisioning/roles/registry/files/domain.crt
+provisioning/roles/registry/files/domain.key
+provisioning/roles/security_tools/files/cosign.key
+provisioning/roles/security_tools/files/cosign.pub
+*.pem
+*.key
+
+# Temp files
+*.tmp
+*.bak

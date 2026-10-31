@@ -1,0 +1,55 @@
+- name: Проверить, что профиль docker-default загружен
+  ansible.builtin.command: aa-status
+  register: aa_status
+  changed_when: false
+
+- name: Assert, что docker-default в списке профилей
+  ansible.builtin.assert:
+    that:
+      - "'docker-default' in aa_status.stdout"
+    fail_msg: "Профиль docker-default не загружен!"
+    success_msg: "Профиль docker-default загружен"
+
+- name: Запустить тестовый контейнер для AppArmor
+  community.docker.docker_container:
+    name: apparmor-test
+    image: alpine:3.19
+    command: sleep 300
+    user: "1000"
+    state: started
+    recreate: false
+
+- name: Проверить, что к контейнеру применён AppArmor-профиль
+  ansible.builtin.command: docker inspect apparmor-test --format '{{ '{{' }}.AppArmorProfile{{ '}}' }}'
+  register: apparmor_profile
+  changed_when: false
+
+- name: Assert, что профиль docker-default применён
+  ansible.builtin.assert:
+    that:
+      - "apparmor_profile.stdout == 'docker-default'"
+    fail_msg: "AppArmor-профиль не применён! (получено: {{ '{{' }} apparmor_profile.stdout {{ '}}' }})"
+    success_msg: "AppArmor-профиль docker-default применён"
+
+- name: Проверить блокировку записи в /proc/sysrq-trigger
+  ansible.builtin.command: docker exec apparmor-test sh -c "echo 1 > /proc/sysrq-trigger"
+  register: sysrq_result
+  failed_when: sysrq_result.rc == 0
+  changed_when: false
+
+- name: Проверить блокировку чтения /etc/shadow
+  ansible.builtin.command: docker exec apparmor-test cat /etc/shadow
+  register: shadow_result
+  failed_when: shadow_result.rc == 0
+  changed_when: false
+
+- name: Проверить блокировку создания устройства /dev/sda
+  ansible.builtin.command: docker exec apparmor-test mknod /dev/sda b 8 0
+  register: mknod_result
+  failed_when: mknod_result.rc == 0
+  changed_when: false
+
+- name: Удалить тестовый контейнер
+  community.docker.docker_container:
+    name: apparmor-test
+    state: absent

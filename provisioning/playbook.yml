@@ -1,0 +1,48 @@
+- hosts: all
+  become: true
+  roles:
+    - common
+  tags: common
+
+- hosts: docker:registry
+  become: true
+  tasks:
+    - name: Сбросить SSH-соединение
+      ansible.builtin.meta: reset_connection
+  tags: reset_ssh
+
+- hosts: registry
+  become: true
+  roles:
+    - registry
+  tags: registry
+
+- hosts: docker
+  become: true
+  roles:
+    - registry_client
+  tags: registry_client
+
+- hosts: docker
+  become: true
+  roles:
+    - security_tools
+  tags: security
+
+#- hosts: docker:registry
+ # become: true
+  #roles:
+   # - logging_sender
+ # tags: logging
+
+- hosts: storage
+  become: true
+  roles:
+    - logging_receiver
+  tags: logging_receiver
+
+- hosts: docker
+  become: true
+  roles:
+    - apparmor_test
+  tags: apparmor_test
