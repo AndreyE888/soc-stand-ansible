@@ -29,11 +29,11 @@
     - security_tools
   tags: security
 
-#- hosts: docker:registry
- # become: true
-  #roles:
-   # - logging_sender
- # tags: logging
+- hosts: docker:registry
+  become: true
+  roles:
+    - logging_sender
+  tags: logging
 
 - hosts: storage
   become: true
@@ -41,8 +41,3 @@
     - logging_receiver
   tags: logging_receiver
 
-- hosts: docker
-  become: true
-  roles:
-    - apparmor_test
-  tags: apparmor_test

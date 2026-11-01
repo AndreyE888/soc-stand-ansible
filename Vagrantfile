@@ -48,8 +48,7 @@ Vagrant.configure("2") do |config|
   end
 
   # Поднять eth1 (Host-Only) после загрузки
-  # Ubuntu 24.04 не имеет dhclient, поэтому ip link set — единственный способ
-  # --- Поднять eth1 (Host-Only) и дождаться IP ---
+  # Ubuntu 24.04 не имеет dhclient, поэтому ip link set — единственный способ поднять eth1 (Host-Only) и дождаться IP
   config.vm.provision "shell", run: "always", inline: <<-SHELL
     echo "Waiting for eth1 to get an IP..."
     for i in {1..30}; do

@@ -1,0 +1,96 @@
+# Cosign: блокировка неподписанного образа (1-й рубеж)
+- name: Smoke | Cosign блокирует неподписанный образ
+  ansible.builtin.command: docker run --rm alpine:3.19 echo "FAIL"
+  register: cosign_block
+  failed_when: cosign_block.rc == 0
+  changed_when: false
+
+# OPA: блокировка latest (2-й рубеж)
+- name: Smoke | OPA блокирует latest
+  ansible.builtin.command: /usr/bin/docker run --rm alpine:latest echo "FAIL"
+  register: opa_latest
+  failed_when: opa_latest.rc == 0
+  changed_when: false
+
+# OPA: блокировка privileged
+- name: Smoke | OPA блокирует privileged
+  ansible.builtin.command: /usr/bin/docker run --rm --user 1000 --privileged alpine:3.19 echo "FAIL"
+  register: opa_priv
+  failed_when: opa_priv.rc == 0
+  changed_when: false
+
+# OPA: пропуск безопасного запуска
+- name: Smoke | OPA пропускает безопасный запуск (user 1000)
+  ansible.builtin.command: /usr/bin/docker run --rm --user 1000 alpine:3.19 echo "OK"
+  register: opa_ok
+  failed_when: opa_ok.rc != 0
+  changed_when: false
+
+# OPA: блокировка опасной capability (SYS_ADMIN)
+- name: Smoke | OPA блокирует --cap-add=SYS_ADMIN
+  ansible.builtin.command: /usr/bin/docker run --rm --user 1000 --cap-add=SYS_ADMIN alpine:3.19 echo "FAIL"
+  register: opa_cap_bad
+  failed_when: opa_cap_bad.rc == 0
+  changed_when: false
+
+# OPA: пропуск безопасной capability (CHOWN)
+- name: Smoke | OPA пропускает --cap-add=CHOWN
+  ansible.builtin.command: /usr/bin/docker run --rm --user 1000 --cap-add=CHOWN alpine:3.19 echo "OK"
+  register: opa_cap_ok
+  failed_when: opa_cap_ok.rc != 0
+  changed_when: false
+
+
+# AppArmor: проверка загрузки профиля
+- name: Smoke | Проверить, что профиль docker-default загружен
+  ansible.builtin.command: aa-status
+  register: aa_status
+  changed_when: false
+
+- name: Smoke | Assert, что docker-default в списке профилей
+  ansible.builtin.assert:
+    that:
+      - "'docker-default' in aa_status.stdout"
+    fail_msg: "Профиль docker-default не загружен!"
+    success_msg: "Профиль docker-default загружен"
+
+# AppArmor: запуск тестового контейнера
+- name: Smoke | Запустить контейнер для проверки AppArmor
+  community.docker.docker_container:
+    name: smoke-apparmor-test
+    image: alpine:3.19
+    command: sleep 300
+    user: "1000"
+    state: started
+    recreate: false
+
+- name: Smoke | AppArmor применяет docker-default
+  ansible.builtin.command: docker inspect smoke-apparmor-test --format '{{ '{{' }}.AppArmorProfile{{ '}}' }}'
+  register: apparmor_profile
+  failed_when: apparmor_profile.stdout != "docker-default"
+  changed_when: false
+
+# AppArmor: тесты на блокировку опасных действий
+- name: Smoke | Проверить блокировку записи в /proc/sysrq-trigger
+  ansible.builtin.command: docker exec smoke-apparmor-test sh -c "echo 1 > /proc/sysrq-trigger"
+  register: sysrq_result
+  failed_when: sysrq_result.rc == 0
+  changed_when: false
+
+- name: Smoke | Проверить блокировку чтения /etc/shadow
+  ansible.builtin.command: docker exec smoke-apparmor-test cat /etc/shadow
+  register: shadow_result
+  failed_when: shadow_result.rc == 0
+  changed_when: false
+
+- name: Smoke | Проверить блокировку создания устройства /dev/sda
+  ansible.builtin.command: docker exec smoke-apparmor-test mknod /dev/sda b 8 0
+  register: mknod_result
+  failed_when: mknod_result.rc == 0
+  changed_when: false
+
+# Удаление тестового контейнера
+- name: Smoke | Удалить тестовый контейнер AppArmor
+  community.docker.docker_container:
+    name: smoke-apparmor-test
+    state: absent

@@ -18,8 +18,6 @@ cosign_version: v3.1.3
 cosign_key_password: "vagrant"
 
 # OPA
-opa_version: v1.21.3
-opa_addr: "0.0.0.0:8181"
 opa_authz_plugin: "openpolicyagent/opa-docker-authz-v2:0.4"
 opa_plugin_alias: "opa-authz"
 

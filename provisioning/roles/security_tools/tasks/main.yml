@@ -32,7 +32,7 @@
   register: plugin_list
   changed_when: false
 
-- name: Установить плагин opa-authz (если не установлен)
+- name: Установить плагин opa-authz
   ansible.builtin.shell: >
     /usr/bin/docker plugin install {{ opa_authz_plugin }}
     --alias opa-authz --grant-all-permissions

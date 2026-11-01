@@ -1,10 +1,10 @@
-- name: Установить linux-headers и dkms
+- name: Установить зависимости для Falco
   ansible.builtin.apt:
     name:
-      - linux-headers-generic
-      - dkms
-      - make
-      - gcc
+      - curl
+      - gpg
+      - apt-transport-https
+      - ca-certificates
     state: present
     update_cache: true
 
@@ -26,40 +26,61 @@
       Signed-By: /usr/share/keyrings/falco-archive-keyring.gpg
     mode: '0644'
 
-- name: Установить Falco 0.38.2
+- name: Обновить apt cache
   ansible.builtin.apt:
-    name: falco=0.38.2
-    state: present
     update_cache: true
 
-- name: Отключить falco-modern-bpf
-  ansible.builtin.systemd:
-    name: falco-modern-bpf
-    state: stopped
-    enabled: false
-  ignore_errors: true
-
-- name: Собрать модуль ядра Falco (kmod)
-  ansible.builtin.shell: dkms autoinstall && modprobe falco
-  args:
-    creates: /dev/falco0
-
-- name: Включить и запустить falco.service
-  ansible.builtin.systemd:
+- name: Установить Falco
+  ansible.builtin.apt:
     name: falco
-    state: started
-    enabled: true
+    state: present
 
-- name: Скопировать локальные правила Falco
+- name: Создать папку для доп. конфигов falco
+  ansible.builtin.file:
+    path: /etc/falco/config.d
+    state: directory
+    mode: '0755'
+
+- name: Создать доп. конфиг для записи логов falco в файл
   ansible.builtin.copy:
-    src: falco_rules.local.yaml
-    dest: /etc/falco/falco_rules.local.yaml
+    dest: /etc/falco/config.d/99-file-output.yaml
+    content: |
+      file_output:
+        enabled: true
+        keep_alive: false
+        filename: /var/log/falco/events.log
     mode: '0644'
   notify: Restart falco
 
-- name: Настроить rsyslog-отправитель (50-falco.conf)
-  ansible.builtin.template:
-    src: 50-falco.conf.j2
+- name: Создать директорию для логов falco
+  ansible.builtin.file:
+    path: /var/log/falco
+    state: directory
+    mode: '0755'
+
+- name: Разрешить чтение логов Falco для rsyslog
+  ansible.builtin.file:
+    path: /var/log/falco/events.log
+    mode: '0644'
+    state: touch
+
+- name: Установить rsyslog
+  ansible.builtin.apt:
+    name: rsyslog
+    state: present
+
+- name: Настроить rsyslog на чтение логов Falco (50-falco.conf)
+  ansible.builtin.copy:
     dest: /etc/rsyslog.d/50-falco.conf
+    content: |
+      module(load="imfile")
+      input(type="imfile" File="/var/log/falco/events.log" Tag="falco:" Facility="local0")
+      local0.* action(type="omfwd" target="192.168.57.12" port="514" protocol="tcp")
     mode: '0644'
   notify: Restart rsyslog
+
+- name: Убедиться, что rsyslog запущен и включен
+  ansible.builtin.systemd:
+    name: rsyslog
+    state: restarted
+    enabled: true
