@@ -8,32 +8,15 @@
     state: present
     update_cache: true
 
-- name: Скачать ключ Falco
-  ansible.builtin.shell: |
-    curl -fsSL https://falco.org/repo/falcosecurity-packages.asc | \
-    gpg --dearmor -o /usr/share/keyrings/falco-archive-keyring.gpg
-  args:
-    creates: /usr/share/keyrings/falco-archive-keyring.gpg
-
-- name: Добавить репозиторий Falco
+- name: Скопировать .deb пакет Falco на VM
   ansible.builtin.copy:
-    dest: /etc/apt/sources.list.d/falco.sources
-    content: |
-      Types: deb
-      URIs: https://download.falco.org/packages/deb
-      Suites: stable
-      Components: main
-      Signed-By: /usr/share/keyrings/falco-archive-keyring.gpg
+    src: falco-0.45.2-x86_64.deb
+    dest: /tmp/falco-0.45.2-x86_64.deb
     mode: '0644'
-
-- name: Обновить apt cache
-  ansible.builtin.apt:
-    update_cache: true
 
 - name: Установить Falco
   ansible.builtin.apt:
-    name: falco
-    state: present
+    deb: /tmp/falco-0.45.2-x86_64.deb
 
 - name: Создать папку для доп. конфигов falco
   ansible.builtin.file:
